@@ -39,19 +39,7 @@ header {
     margin-bottom: 3rem;
 }
 
-.logo-section {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.app-logo {
-    height: 70px;
-    width: auto;
-    object-fit: contain;
-}
-
-.logo-text h1 {
+.logo-section h1 {
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.5px;
