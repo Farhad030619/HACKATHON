@@ -42,7 +42,8 @@ STATE = {
     'co2_saved': 0.0, # in grams
     'radio_state': "DEEP SLEEP",
     'anomaly_count': 0,
-    'mock_anomaly_duration': 0
+    'mock_anomaly_duration': 0,
+    'new_anomaly_trigger': False
 }
 
 STATE_CHANGE_EVENT = threading.Event()
@@ -103,6 +104,7 @@ def serial_listener():
                             if current_t - STATE.get('last_anomaly_time', 0) > 1.0:
                                 STATE['anomaly_count'] += 1
                                 STATE['last_anomaly_time'] = current_t
+                                STATE['new_anomaly_trigger'] = True
                                 
                         if new_status != STATE['system_status']:
                             STATE['system_status'] = new_status
@@ -176,6 +178,10 @@ def get_data_payload():
 
     efficiency = round((1 - (STATE['transmitted_data_points'] / STATE['total_data_points'])) * 100, 1)
     
+    is_new = STATE.get('new_anomaly_trigger', False)
+    if is_new:
+        STATE['new_anomaly_trigger'] = False
+    
     return {
         'ax': round(STATE['current_data']['ax'], 3),
         'ay': round(STATE['current_data']['ay'], 3),
@@ -191,7 +197,8 @@ def get_data_payload():
         'timestamp': time.strftime("%H:%M:%S"),
         'total_points': STATE['total_data_points'],
         'transmitted_points': STATE['transmitted_data_points'],
-        'is_real': not is_mocking
+        'is_real': not is_mocking,
+        'is_new_anomaly': is_new
     }
 
 @app.route('/')
@@ -219,6 +226,7 @@ def mock_anomaly():
     STATE['system_status'] = "ANOMALY DETECTED"
     STATE['anomaly_count'] += 1
     STATE['mock_anomaly_duration'] = 10 # Last for ~5 seconds (at 0.5s intervals)
+    STATE['new_anomaly_trigger'] = True
     return {"status": "success", "count": STATE['anomaly_count']}
 
 @app.route('/chat', methods=['POST'])

@@ -166,8 +166,17 @@ function updateConsole(data) {
     const line = document.createElement('div');
     line.className = 'console-line';
     
-    const isAnomaly = data.status !== 'Healthy' && data.status !== 'OK';
-    const messageClass = isAnomaly ? 'console-message anomaly' : 'console-message';
+    let messageClass = 'console-message';
+    let statusText = data.status;
+
+    if (data.is_new_anomaly) {
+        messageClass = 'console-message anomaly';
+        statusText = "🚨 ANOMALY DETECTED!";
+    } else if (data.status !== 'Healthy' && data.status !== 'OK' && !data.status.includes('Mocking')) {
+        messageClass = 'console-message';
+        statusText = "URLLC Transmitting...";
+        line.style.color = "#ffb347"; // Orange warning color for resolving/transmitting
+    }
     
     // Format: [HH:MM:SS] aX: 0.000, aY: 0.000, aZ: 0.000 | Status: OK
     line.innerHTML = `
@@ -175,7 +184,7 @@ function updateConsole(data) {
         <span class="${messageClass}">
             ACCEL: ${data.ax.toFixed(3)}, ${data.ay.toFixed(3)}, ${data.az.toFixed(3)} | 
             GYRO: ${data.gx.toFixed(2)}, ${data.gy.toFixed(2)}, ${data.gz.toFixed(2)} | 
-            STATUS: ${data.status}
+            STATUS: ${statusText}
         </span>
     `;
     
