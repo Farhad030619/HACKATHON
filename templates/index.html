@@ -36,13 +36,16 @@
             </div>
 
             <!-- Efficiency Metric -->
-            <div class="card">
-                <h2>6G Efficiency</h2>
+            <div class="card clickable-card" id="efficiencyCard" onclick="toggleEfficiencyMode()">
+                <div class="card-header-flex">
+                    <h2>6G Efficiency</h2>
+                    <span class="mode-badge" id="efficiencyMode">PERCENTAGE</span>
+                </div>
                 <div class="status-display">
                     <div id="efficiencyValue" class="metric-value">0%</div>
-                    <div class="metric-label">Bandwidth Saved</div>
+                    <div id="efficiencyLabel" class="metric-label">Bandwidth Saved</div>
                     <p style="font-size: 0.7rem; margin-top: 1rem; color: var(--text-secondary);">
-                        Compared to continuous streaming
+                        Click card to toggle real-world data usage
                     </p>
                 </div>
             </div>
@@ -86,7 +89,7 @@
         </div>
 
         <footer style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">
-            &copy; 2026 Edge AI Analytics Team | Kista HQ
+            &copy; 2026 Edge AI Analytics Team | Nibble AI
         </footer>
     </div>
 

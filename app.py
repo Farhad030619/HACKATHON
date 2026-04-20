@@ -2,7 +2,11 @@ import time
 import random
 import threading
 import json
-import serial
+try:
+    import serial
+    HAS_SERIAL = True
+except ImportError:
+    HAS_SERIAL = False
 from flask import Flask, render_template, Response
 from waitress import serve
 
@@ -34,6 +38,10 @@ def serial_listener():
     """Background thread that listens to the Serial port as provided by user."""
     global system_status, total_data_points, transmitted_data_points, current_data
     
+    if not HAS_SERIAL:
+        print("Serial library not found. Running in MOCK mode.")
+        return
+
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
         time.sleep(0.1) # stabilize
@@ -97,7 +105,9 @@ def get_data_payload():
         'efficiency': efficiency,
         'co2_saved': round(co2_saved, 2),
         'transmitted': is_cloud_transmitted,
-        'timestamp': time.strftime("%H:%M:%S")
+        'timestamp': time.strftime("%H:%M:%S"),
+        'total_points': total_data_points,
+        'transmitted_points': transmitted_data_points
     }
 
 @app.route('/')
@@ -117,8 +127,8 @@ def chart_data():
 
 if __name__ == '__main__':
     # Start Serial Listener
-    serial_thread = threading.Thread(target=serial_listener, daemon=True)
-    serial_thread.start()
+    # serial_thread = threading.Thread(target=serial_listener, daemon=True)
+    # serial_thread.start()
     
     print("Dashboard server starting on http://localhost:5001")
     serve(app, host='0.0.0.0', port=5001, threads=4)

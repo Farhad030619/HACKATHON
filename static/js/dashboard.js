@@ -102,8 +102,8 @@ source.onmessage = function(event) {
         statusText.style.color = '#ff3366';
     }
 
-    // Update Efficiency
-    document.getElementById('efficiencyValue').innerText = data.efficiency + '%';
+    // Update Efficiency based on mode
+    updateEfficiencyDisplay(data);
 
     // Update CO2
     document.getElementById('co2Value').innerText = data.co2_saved.toFixed(2);
@@ -115,7 +115,7 @@ source.onmessage = function(event) {
     document.getElementById('lastUpdate').innerText = data.timestamp;
 
     // Visual feedback for 'Cloud Transmission'
-    const efficiencyCard = document.getElementById('efficiencyValue').parentElement.parentElement;
+    const efficiencyCard = document.getElementById('efficiencyCard');
     if (data.transmitted) {
         efficiencyCard.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.2)';
         setTimeout(() => {
@@ -123,3 +123,30 @@ source.onmessage = function(event) {
         }, 300);
     }
 });
+
+let efficiencyMode = 'PERCENTAGE'; // 'PERCENTAGE' or 'REAL_WORLD'
+
+function toggleEfficiencyMode() {
+    efficiencyMode = (efficiencyMode === 'PERCENTAGE') ? 'REAL_WORLD' : 'PERCENTAGE';
+    document.getElementById('efficiencyMode').innerText = efficiencyMode.replace('_', ' ');
+    // Re-trigger update will happen on next message
+}
+
+function updateEfficiencyDisplay(data) {
+    const valueEl = document.getElementById('efficiencyValue');
+    const labelEl = document.getElementById('efficiencyLabel');
+
+    if (efficiencyMode === 'PERCENTAGE') {
+        valueEl.innerText = data.efficiency + '%';
+        labelEl.innerText = 'Bandwidth Saved';
+    } else {
+        // Real world: 100 bytes per message
+        const bytesSaved = (data.total_points - data.transmitted_points) * 100;
+        if (bytesSaved > 1024 * 1024) {
+            valueEl.innerText = (bytesSaved / (1024 * 1024)).toFixed(2) + ' MB';
+        } else {
+            valueEl.innerText = (bytesSaved / 1024).toFixed(1) + ' KB';
+        }
+        labelEl.innerText = 'Data Saved (Estimated)';
+    }
+}
