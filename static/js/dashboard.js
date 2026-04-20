@@ -1,4 +1,4 @@
-const socket = io();
+const source = new EventSource("/chart-data");
 
 // Chart Configuration
 const ctx = document.getElementById('vibrationChart').getContext('2d');
@@ -72,7 +72,8 @@ const chart = new Chart(ctx, {
 const MAX_DATA_POINTS = 50;
 let timeIndex = 0;
 
-socket.on('sensor_data', (data) => {
+source.onmessage = function(event) {
+    const data = JSON.parse(event.data);
     // Update Chart
     chart.data.labels.push('');
     chart.data.datasets[0].data.push(data.x);
