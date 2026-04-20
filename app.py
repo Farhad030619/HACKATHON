@@ -36,25 +36,13 @@ STATE = {
         'ax': 0, 'ay': 0, 'az': 0,
         'gx': 0, 'gy': 0, 'gz': 0
     },
-    'co2_saved': 0.0 # in grams
+    'co2_saved': 0.0, # in grams
+    'radio_state': "DEEP SLEEP"
 }
 
 def calculate_co2_saved():
-    time_since_tx = time.time() - STATE['last_tx_time']
-    
-    # Simulation of 6G Radio Energy States:
-    # 1. Active/Tail (0-3s): Radio is power-hungry, minimal saving.
-    # 2. Idle (3-10s): Radio is waiting, moderate saving.
-    # 3. Deep Sleep (>10s): Radio is off, maximum sustainability impact!
-    
-    if time_since_tx > 10:
-        increment = 0.12  # Accelerating savings in Deep Sleep
-    elif time_since_tx > 3:
-        increment = 0.04  # Moderate savings in Idle
-    else:
-        increment = 0.002 # Minimal savings due to Tail Energy
-        
-    STATE['co2_saved'] += increment
+    # Simple linear saving model
+    STATE['co2_saved'] += 0.05
 
 def serial_listener():
     """Background thread that listens to the Serial port."""
@@ -135,17 +123,22 @@ def get_data_payload():
     
     is_cloud_transmitted = (STATE['system_status'] in ["ANOMALY", "Anomaly Detected"] or STATE['total_data_points'] % 20 == 0)
     
+    # Calculate Radio State based on transmission
     if is_cloud_transmitted:
+        STATE['radio_state'] = "ACTIVE"
+        STATE['last_tx_time'] = time.time()
         STATE['transmitted_data_points'] += 1
-        STATE['last_tx_time'] = time.time() 
     else:
+        # If not active, check if we are in "Tail" period (2 seconds after TX)
+        time_since_tx = time.time() - STATE['last_tx_time']
+        if time_since_tx < 2.0:
+            STATE['radio_state'] = "TAIL"
+        else:
+            STATE['radio_state'] = "DEEP SLEEP"
         calculate_co2_saved()
 
     efficiency = round((1 - (STATE['transmitted_data_points'] / STATE['total_data_points'])) * 100, 1)
     
-    time_since_tx = time.time() - STATE['last_tx_time']
-    radio_state = "ACTIVE" if time_since_tx < 1.0 else ("TAIL" if time_since_tx < 3.0 else "DEEP SLEEP")
-
     return {
         'ax': round(STATE['current_data']['ax'], 3),
         'ay': round(STATE['current_data']['ay'], 3),
@@ -156,8 +149,8 @@ def get_data_payload():
         'status': STATE['system_status'],
         'efficiency': efficiency,
         'co2_saved': round(STATE['co2_saved'], 2),
-        'radio_state': radio_state,
         'transmitted': is_cloud_transmitted,
+        'radio_state': STATE['radio_state'],
         'timestamp': time.strftime("%H:%M:%S"),
         'total_points': STATE['total_data_points'],
         'transmitted_points': STATE['transmitted_data_points'],

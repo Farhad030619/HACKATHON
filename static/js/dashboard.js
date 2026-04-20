@@ -246,6 +246,7 @@ function updateEfficiencyDisplay(data) {
     }
 }
 
+
 function updateRadioStateDisplay(data) {
     const radioEl = document.getElementById('radioState');
     if (!radioEl) return;
