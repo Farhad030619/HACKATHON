@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # --- CONFIGURATION ---
 SERIAL_PORT = '/dev/ttyACM0'
-BAUD_RATE = 115200
+BAUD_RATE = 9600
 # ---------------------
 
 # State variables
@@ -41,38 +41,49 @@ def serial_listener():
 
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
-        time.sleep(0.5) 
-        print(f"SERIAL: Attempting to read from {SERIAL_PORT}...")
+        ser.flushInput()
+        time.sleep(1) 
+        print(f"SERIAL: Connected to {SERIAL_PORT} at {BAUD_RATE} baud.")
         
         while True:
-            byte_string = ser.readline()
-            if byte_string:
-                line = byte_string.decode('utf-8', errors='ignore').strip()
-                if not line: continue
-                
+            if ser.in_waiting > 0:
+                byte_string = ser.readline()
                 try:
-                    if "aX" in line: continue
+                    line = byte_string.decode('utf-8', errors='ignore').strip()
+                    if not line: continue
+                    
+                    # Log the raw line for debugging
+                    print(f"SERIAL Received: {line}")
+                    
+                    if "aX" in line: continue # Skip header
+                    
                     parts = [p.strip() for p in line.split(',')]
                     if len(parts) >= 7:
-                        ax, ay, az = map(float, parts[0:3])
-                        gx, gy, gz = map(float, parts[3:6])
-                        status_str = parts[6]
-                        
-                        current_data = {
-                            'ax': ax, 'ay': ay, 'az': az,
-                            'gx': gx, 'gy': gy, 'gz': gz
-                        }
-                        total_data_points += 1
-                        last_real_data_time = time.time()
-                        
-                        if status_str.upper() == "OK":
-                            system_status = "Healthy"
-                        else:
-                            system_status = status_str
-                except:
-                    pass
+                        try:
+                            ax, ay, az = map(float, parts[0:3])
+                            gx, gy, gz = map(float, parts[3:6])
+                            status_str = parts[6]
+                            
+                            current_data = {
+                                'ax': ax, 'ay': ay, 'az': az,
+                                'gx': gx, 'gy': gy, 'gz': gz
+                            }
+                            total_data_points += 1
+                            last_real_data_time = time.time()
+                            
+                            if status_str.upper() == "OK":
+                                system_status = "Healthy"
+                            else:
+                                system_status = status_str
+                        except ValueError:
+                            print(f"SERIAL ERROR: Could not parse floats in line: {line}")
+                except Exception as e:
+                    print(f"SERIAL DECODE ERROR: {e}")
+            else:
+                time.sleep(0.01) # Small sleep to prevent CPU hogging
     except Exception as e:
         print(f"SERIAL ERROR: {e}")
+        time.sleep(2) # Wait before retry if port fails
 
 def get_data_payload():
     global system_status, total_data_points, transmitted_data_points, current_data, co2_saved, last_real_data_time
@@ -96,7 +107,7 @@ def get_data_payload():
         total_data_points += 1
         system_status = "Mocking Data (No Sensor)"
     
-    is_cloud_transmitted = (system_status == "Anomaly Detected" or total_data_points % 20 == 0)
+    is_cloud_transmitted = (system_status == "ANOMALY" or system_status == "Anomaly Detected" or total_data_points % 20 == 0)
     
     if is_cloud_transmitted:
         transmitted_data_points += 1
@@ -135,7 +146,10 @@ def chart_data():
                 yield f"data: {json.dumps(data)}\n\n"
             time.sleep(0.1)
             
-    return Response(generate(), mimetype='text/event-stream')
+    response = Response(generate(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
 
 if __name__ == '__main__':
     # Start Serial Listener

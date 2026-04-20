@@ -1,4 +1,20 @@
-const source = new EventSource("/chart-data");
+let source;
+
+function initEventSource() {
+    if (source) source.close();
+    source = new EventSource("/chart-data");
+
+    source.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        updateDashboard(data);
+    };
+
+    source.onerror = function(err) {
+        console.error("EventSource connection lost. Retrying in 1s...");
+        source.close();
+        setTimeout(initEventSource, 1000);
+    };
+}
 
 // Chart Configuration
 const ctx = document.getElementById('vibrationChart').getContext('2d');
@@ -40,41 +56,28 @@ const chart = new Chart(ctx, {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            x: {
-                display: false
-            },
+            x: { display: false },
             y: {
                 beginAtZero: false,
-                grid: {
-                    color: 'rgba(255, 255, 255, 0.05)'
-                },
-                ticks: {
-                    color: '#a0a0a0'
-                }
+                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                ticks: { color: '#a0a0a0' }
             }
         },
         plugins: {
             legend: {
                 position: 'bottom',
-                labels: {
-                    color: '#ffffff',
-                    usePointStyle: true,
-                    padding: 20
-                }
+                labels: { color: '#ffffff', usePointStyle: true, padding: 20 }
             }
         },
-        animation: {
-            duration: 0 // Disable animation for smoother streaming
-        }
+        animation: { duration: 0 }
     }
 });
 
 const MAX_DATA_POINTS = 50;
-let timeIndex = 0;
+let efficiencyMode = 'PERCENTAGE';
 
-source.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    // Update Chart (using accelerometer data for the main chart)
+function updateDashboard(data) {
+    // Update Chart
     chart.data.labels.push('');
     chart.data.datasets[0].data.push(data.ax);
     chart.data.datasets[1].data.push(data.ay);
@@ -86,7 +89,7 @@ source.onmessage = function(event) {
         chart.data.datasets[1].data.shift();
         chart.data.datasets[2].data.shift();
     }
-    chart.update('none'); // Update without animation for performance
+    chart.update('none');
 
     // Update Status
     const statusIndicator = document.getElementById('statusIndicator');
@@ -102,18 +105,17 @@ source.onmessage = function(event) {
         statusText.style.color = '#ff3366';
     }
 
-    // Update Efficiency based on mode
+    // Update Efficiency
     updateEfficiencyDisplay(data);
 
     // Update CO2
     document.getElementById('co2Value').innerText = data.co2_saved.toFixed(2);
 
-    // Update Raw Telemetry (Accelerometer)
+    // Update Telemetry
     document.getElementById('rawAX').innerText = data.ax.toFixed(3);
     document.getElementById('rawAY').innerText = data.ay.toFixed(3);
     document.getElementById('rawAZ').innerText = data.az.toFixed(3);
     
-    // Update Raw Telemetry (Gyroscope)
     if (document.getElementById('rawGX')) {
         document.getElementById('rawGX').innerText = data.gx.toFixed(2);
         document.getElementById('rawGY').innerText = data.gy.toFixed(2);
@@ -122,22 +124,17 @@ source.onmessage = function(event) {
     
     document.getElementById('lastUpdate').innerText = data.timestamp;
 
-    // Visual feedback for 'Cloud Transmission'
+    // Visual feedback
     const efficiencyCard = document.getElementById('efficiencyCard');
     if (data.transmitted) {
         efficiencyCard.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.2)';
-        setTimeout(() => {
-            efficiencyCard.style.boxShadow = 'none';
-        }, 300);
+        setTimeout(() => { efficiencyCard.style.boxShadow = 'none'; }, 300);
     }
-});
-
-let efficiencyMode = 'PERCENTAGE'; // 'PERCENTAGE' or 'REAL_WORLD'
+}
 
 function toggleEfficiencyMode() {
     efficiencyMode = (efficiencyMode === 'PERCENTAGE') ? 'REAL_WORLD' : 'PERCENTAGE';
     document.getElementById('efficiencyMode').innerText = efficiencyMode.replace('_', ' ');
-    // Re-trigger update will happen on next message
 }
 
 function updateEfficiencyDisplay(data) {
@@ -148,7 +145,6 @@ function updateEfficiencyDisplay(data) {
         valueEl.innerText = data.efficiency + '%';
         labelEl.innerText = 'Bandwidth Saved';
     } else {
-        // Real world: 100 bytes per message
         const bytesSaved = (data.total_points - data.transmitted_points) * 100;
         if (bytesSaved > 1024 * 1024) {
             valueEl.innerText = (bytesSaved / (1024 * 1024)).toFixed(2) + ' MB';
@@ -158,3 +154,6 @@ function updateEfficiencyDisplay(data) {
         labelEl.innerText = 'Data Saved (Estimated)';
     }
 }
+
+// Start connection
+initEventSource();
