@@ -29,6 +29,7 @@ BAUD_RATE = 9600
 system_status = "Healthy"
 total_data_points = 0
 transmitted_data_points = 0
+last_tx_time = time.time()
 last_real_data_time = 0
 current_data = {
     'ax': 0, 'ay': 0, 'az': 0,
@@ -36,9 +37,23 @@ current_data = {
 }
 co2_saved = 0.0 # in grams
 
-def calculate_co2_saved(efficiency):
-    global co2_saved
-    co2_saved += 0.05 
+def calculate_co2_saved():
+    global co2_saved, last_tx_time
+    time_since_tx = time.time() - last_tx_time
+    
+    # Simulation of 6G Radio Energy States:
+    # 1. Active/Tail (0-3s): Radio is power-hungry, minimal saving.
+    # 2. Idle (3-10s): Radio is waiting, moderate saving.
+    # 3. Deep Sleep (>10s): Radio is off, maximum sustainability impact!
+    
+    if time_since_tx > 10:
+        increment = 0.12  # Accelerating savings in Deep Sleep
+    elif time_since_tx > 3:
+        increment = 0.04  # Moderate savings in Idle
+    else:
+        increment = 0.002 # Minimal savings due to Tail Energy
+        
+    co2_saved += increment
 
 def serial_listener():
     """Background thread that listens to the Serial port."""
@@ -129,11 +144,15 @@ def get_data_payload():
     
     if is_cloud_transmitted:
         transmitted_data_points += 1
+        last_tx_time = time.time() # Reset "Tail Energy" timer
     else:
-        calculate_co2_saved(0)
+        calculate_co2_saved()
 
     efficiency = round((1 - (transmitted_data_points / total_data_points)) * 100, 1)
     
+    time_since_tx = time.time() - last_tx_time
+    radio_state = "ACTIVE" if time_since_tx < 1.0 else ("TAIL" if time_since_tx < 3.0 else "DEEP SLEEP")
+
     return {
         'ax': round(current_data['ax'], 3),
         'ay': round(current_data['ay'], 3),
@@ -144,6 +163,7 @@ def get_data_payload():
         'status': system_status,
         'efficiency': efficiency,
         'co2_saved': round(co2_saved, 2),
+        'radio_state': radio_state,
         'transmitted': is_cloud_transmitted,
         'timestamp': time.strftime("%H:%M:%S"),
         'total_points': total_data_points,

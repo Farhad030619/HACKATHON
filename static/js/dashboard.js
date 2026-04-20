@@ -127,6 +127,9 @@ function updateDashboard(data) {
     // Update Efficiency
     updateEfficiencyDisplay(data);
 
+    // Update Radio State
+    updateRadioStateDisplay(data);
+
     // Update CO2
     document.getElementById('co2Value').innerText = data.co2_saved.toFixed(2);
 
@@ -241,6 +244,18 @@ function updateEfficiencyDisplay(data) {
         }
         labelEl.innerText = 'Data Saved (Estimated)';
     }
+}
+
+function updateRadioStateDisplay(data) {
+    const radioEl = document.getElementById('radioState');
+    if (!radioEl) return;
+
+    const state = data.radio_state;
+    radioEl.innerText = state;
+    
+    // Convert "DEEP SLEEP" to "DEEP-SLEEP" for CSS class
+    const cssClass = state.replace(' ', '-');
+    radioEl.className = `radio-state ${cssClass}`;
 }
 
 // Start connection
