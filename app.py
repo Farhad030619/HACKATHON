@@ -119,7 +119,7 @@ def serial_listener():
             time.sleep(2)
 
 def get_data_payload():
-    global system_status, total_data_points, transmitted_data_points, current_data, co2_saved, last_real_data_time
+    global system_status, total_data_points, transmitted_data_points, current_data, co2_saved, last_real_data_time, last_tx_time
     
     # If no data has arrived in the last 2 seconds, use mock data
     is_mocking = (time.time() - last_real_data_time > 2.0)
