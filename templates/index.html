@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge AI Dashboard | Ericsson Hackathon</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-section">
+                <h1>EDGE ANOMALY DETECTION</h1>
+                <p style="color: var(--text-secondary); font-size: 0.8rem;">Powered by 6G Event-Driven Uplink</p>
+            </div>
+            <div class="badge">Ericsson HQ 2026</div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Vibration Chart -->
+            <div class="card main-chart-card">
+                <h2>Real-time Vibration (m/s²)</h2>
+                <div style="height: 300px; position: relative;">
+                    <canvas id="vibrationChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Status Indicator -->
+            <div class="card">
+                <h2>System Health</h2>
+                <div class="status-display">
+                    <div id="statusIndicator" class="status-indicator status-healthy"></div>
+                    <div id="statusText" class="status-text">SYSTEM HEALTHY</div>
+                </div>
+            </div>
+
+            <!-- Efficiency Metric -->
+            <div class="card">
+                <h2>6G Efficiency</h2>
+                <div class="status-display">
+                    <div id="efficiencyValue" class="metric-value">0%</div>
+                    <div class="metric-label">Bandwidth Saved</div>
+                    <p style="font-size: 0.7rem; margin-top: 1rem; color: var(--text-secondary);">
+                        Compared to continuous streaming
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <footer style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">
+            &copy; 2026 Edge AI Analytics Team | Kista HQ
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
