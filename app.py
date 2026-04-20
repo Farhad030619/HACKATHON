@@ -162,7 +162,7 @@ def chart_data():
             data = get_data_payload()
             if data:
                 yield f"data: {json.dumps(data)}\n\n"
-            time.sleep(0.1)
+            time.sleep(0.5)
             
     response = Response(generate(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'
