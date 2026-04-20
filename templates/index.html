@@ -28,7 +28,10 @@
 
             <!-- Status Indicator -->
             <div class="card">
-                <h2>System Health</h2>
+                <div class="card-header-flex">
+                    <h2>System Health</h2>
+                    <div id="urllcBadge" class="urllc-badge">URLLC ACTIVE</div>
+                </div>
                 <div class="status-display">
                     <div id="statusIndicator" class="status-indicator status-healthy"></div>
                     <div id="statusText" class="status-text">SYSTEM HEALTHY</div>
@@ -113,6 +116,29 @@
                         Carbon footprint reduction through localized Edge AI processing.
                     </p>
                     <div class="leaf-icon">🍃</div>
+                </div>
+            </div>
+
+            <!-- AI Chat Assistant -->
+            <div class="card chat-card">
+                <div class="card-header-flex">
+                    <h2>Nibble AI Assistant</h2>
+                    <div class="badge">Edge Intelligence</div>
+                </div>
+                <div class="chat-container">
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="message system">Hello! I'm your Nibble AI assistant. I can help you analyze telemetry and anomalies.</div>
+                    </div>
+                    <div class="chat-suggestions">
+                        <button onclick="askAI('How many anomalies have occurred?')">How many anomalies have occurred?</button>
+                        <button onclick="askAI('What is the current system efficiency?')">System Efficiency?</button>
+                        <button onclick="askAI('Sustainability impact?')">CO2 Impact?</button>
+                        <button onclick="triggerMockAnomaly()" class="btn-warn">Simulate Anomaly</button>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chatInput" placeholder="Ask about system data..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                        <button onclick="sendMessage()">Send</button>
+                    </div>
                 </div>
             </div>
 

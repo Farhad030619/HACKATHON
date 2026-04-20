@@ -40,7 +40,9 @@ STATE = {
         'ax': 0, 'ay': 0, 'az': 0
     },
     'co2_saved': 0.0, # in grams
-    'radio_state': "DEEP SLEEP"
+    'radio_state': "DEEP SLEEP",
+    'anomaly_count': 0,
+    'mock_anomaly_duration': 0
 }
 
 def calculate_co2_saved():
@@ -93,6 +95,9 @@ def serial_listener():
                         STATE['last_real_data_time'] = time.time()
                         
                         STATE['system_status'] = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        if STATE['system_status'] != "Healthy":
+                            STATE['anomaly_count'] += 1
+                            
                         logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
                         
                     except ValueError as ve:
@@ -122,7 +127,11 @@ def get_data_payload():
             'gz': random.uniform(-1, 1)
         }
         STATE['total_data_points'] += 1
-        STATE['system_status'] = "Mocking Data (No Sensor)"
+        if STATE['mock_anomaly_duration'] > 0:
+            STATE['system_status'] = "ANOMALY DETECTED"
+            STATE['mock_anomaly_duration'] -= 1
+        else:
+            STATE['system_status'] = "Mocking Data (No Sensor)"
     
     is_cloud_transmitted = (STATE['system_status'] in ["ANOMALY", "Anomaly Detected"] or STATE['total_data_points'] % 20 == 0)
     
@@ -192,6 +201,49 @@ def chart_data():
     response.headers['Cache-Control'] = 'no-cache'
     response.headers['X-Accel-Buffering'] = 'no'
     return response
+
+@app.route('/mock_anomaly', methods=['POST'])
+def mock_anomaly():
+    STATE['system_status'] = "ANOMALY DETECTED"
+    STATE['anomaly_count'] += 1
+    STATE['mock_anomaly_duration'] = 10 # Last for ~5 seconds (at 0.5s intervals)
+    return {"status": "success", "count": STATE['anomaly_count']}
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    from flask import request
+    query = request.json.get('query', '').lower()
+    
+    # Nibble AI: Short, Simple, Edge-focused responses
+    if any(k in query for k in ["how many anomalies", "anomaly count", "how many errors"]):
+        count = STATE['anomaly_count']
+        if count == 0:
+            return {"response": "Zero anomalies detected. The system is operating within nominal parameters."}
+        return {"response": f"I've recorded {count} anomalies so far. Most recent event was handled by URLLC priority uplink."}
+
+    if any(k in query for k in ["anomaly", "anomalies", "errors", "broken"]):
+        status = STATE['system_status']
+        if status == "Healthy":
+            return {"response": "System is currently Healthy. Vibrations are stable."}
+        return {"response": f"Current status is {status}. High-frequency vibrations detected! Transmitting to edge node."}
+    
+    if any(k in query for k in ["efficiency", "bandwidth", "saved", "performance"]):
+        eff = round((1 - (STATE['transmitted_data_points'] / max(1, STATE['total_data_points']))) * 100, 1)
+        return {"response": f"6G bandwidth efficiency is at {eff}%. Our Edge AI is filtering {STATE['total_data_points'] - STATE['transmitted_data_points']} redundant telemetry packets."}
+
+    if any(k in query for k in ["co2", "carbon", "sustainability", "green"]):
+        return {"response": f"We have mitigated {round(STATE['co2_saved'], 2)}g of CO₂ emissions by reducing cloud transmission frequency."}
+
+    if any(k in query for k in ["csv", "file", "download", "data", "discuss"]):
+        return {"response": f"The CSV log currently contains {STATE['total_data_points']} data points. It shows a clear correlation between vibration spikes and anomaly triggers."}
+
+    if any(k in query for k in ["status", "mode", "radio"]):
+        return {"response": f"System: {STATE['system_status']}. Radio State: {STATE['radio_state']} (Optimal power mode)."}
+
+    if any(k in query for k in ["hello", "hi", "who are you"]):
+        return {"response": "I'm Nibble AI, your 6G Edge Assistant. I monitor telemetry and help you optimize network performance."}
+
+    return {"response": "I'm not sure about that. Try asking about 'anomalies', 'efficiency', or 'sustainability'."}
 
 if __name__ == '__main__':
     # Start Serial Listener

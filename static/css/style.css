@@ -159,8 +159,8 @@ h2 {
 .status-anomaly {
     background: var(--status-error);
     color: var(--status-error);
-    box-shadow: 0 0 40px rgba(255, 51, 102, 0.3);
-    animation: shake 0.5s infinite;
+    box-shadow: 0 0 40px rgba(255, 51, 102, 0.6);
+    animation: shake 0.2s infinite, pulse 1s infinite;
 }
 
 .status-text {
@@ -417,11 +417,194 @@ h2 {
     border-radius: 10px;
 }
 
+
+/* Chat Assistant Styles */
+.chat-card {
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 1rem;
+    overflow: hidden;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding-right: 0.5rem;
+}
+
+/* Scrollbar for chat */
+.chat-messages::-webkit-scrollbar {
+    width: 4px;
+}
+.chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.message {
+    padding: 0.8rem 1rem;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    max-width: 90%;
+    animation: messageSlide 0.3s ease-out;
+}
+
+.message.system {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message.system[id^="thinking-"] {
+    font-style: italic;
+    color: var(--accent-cyan);
+    opacity: 0.8;
+    background: rgba(0, 229, 255, 0.05);
+    border-color: rgba(0, 229, 255, 0.2);
+}
+
+.message.user {
+    background: var(--accent-blue);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 4px 15px rgba(0, 37, 255, 0.2);
+}
+
+.chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.chat-suggestions button {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chat-suggestions button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.chat-input-area {
+    display: flex;
+    gap: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chat-input-area input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    outline: none;
+}
+
+.chat-input-area button {
+    background: var(--accent-cyan);
+    color: var(--bg-color);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.chat-input-area button:hover {
+    transform: scale(1.05);
+}
+
+@keyframes messageSlide {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* Anomaly Alert Effects */
+.anomaly-active {
+    background-color: #1a0000; /* Darker red background */
+    transition: background-color 0.5s ease;
+}
+
+.anomaly-active::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.2);
+    pointer-events: none;
+    z-index: 9999;
+    animation: pulseRed 2s infinite;
+}
+
+@keyframes pulseRed {
+    0% { box-shadow: inset 0 0 50px rgba(255, 0, 0, 0.1); }
+    50% { box-shadow: inset 0 0 150px rgba(255, 0, 0, 0.3); }
+    100% { box-shadow: inset 0 0 50px rgba(255, 0, 0, 0.1); }
+}
+
+.urllc-badge {
+    background: linear-gradient(135deg, #ff0000, #ff5f00);
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: none; /* Hidden by default */
+    align-items: center;
+    gap: 0.3rem;
+    box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+    animation: bounce 1s infinite;
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
 @media (max-width: 900px) {
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
-    .main-chart-card {
+    .main-chart-card, .console-card {
         grid-column: span 1;
     }
 }

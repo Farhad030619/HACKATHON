@@ -114,14 +114,18 @@ function updateDashboard(data) {
     const statusIndicator = document.getElementById('statusIndicator');
     const statusText = document.getElementById('statusText');
     
-    if (data.status === 'Healthy') {
+    if (data.status === 'Healthy' || data.status === 'OK' || data.status.includes('Mocking')) {
         statusIndicator.className = 'status-indicator status-healthy';
         statusText.innerText = 'SYSTEM HEALTHY';
         statusText.style.color = '#00ff88';
+        document.body.classList.remove('anomaly-active');
+        document.getElementById('urllcBadge').style.display = 'none';
     } else {
         statusIndicator.className = 'status-indicator status-anomaly';
         statusText.innerText = data.status.toUpperCase();
         statusText.style.color = '#ff3366';
+        document.body.classList.add('anomaly-active');
+        document.getElementById('urllcBadge').style.display = 'flex';
     }
 
     // Update Efficiency
@@ -257,6 +261,69 @@ function updateRadioStateDisplay(data) {
     // Convert "DEEP SLEEP" to "DEEP-SLEEP" for CSS class
     const cssClass = state.replace(' ', '-');
     radioEl.className = `radio-state ${cssClass}`;
+}
+
+async function triggerMockAnomaly() {
+    try {
+        const response = await fetch('/mock_anomaly', { method: 'POST' });
+        const data = await response.json();
+        appendMessage('system', "⚠️ URLLC ALERT: Anomaly simulation triggered. Observe the visual feedback and bandwidth priority shift.");
+    } catch (err) {
+        console.error("Mock Error:", err);
+    }
+}
+
+
+// --- CHAT ASSISTANT LOGIC ---
+function askAI(query) {
+    document.getElementById('chatInput').value = query;
+    sendMessage();
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const query = input.value.trim();
+    if (!query) return;
+
+    // Append user message
+    appendMessage('user', query);
+    input.value = '';
+
+    // Thinking indicator
+    const thinkingId = 'thinking-' + Date.now();
+    appendMessage('system', 'Nibble is thinking...', thinkingId);
+
+    try {
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: query })
+        });
+        const data = await response.json();
+        
+        // Remove thinking indicator and add real response
+        const thinkingEl = document.getElementById(thinkingId);
+        if (thinkingEl) thinkingEl.remove();
+        
+        appendMessage('system', data.response);
+    } catch (err) {
+        console.error("Chat Error:", err);
+        const thinkingEl = document.getElementById(thinkingId);
+        if (thinkingEl) thinkingEl.remove();
+        appendMessage('system', "Sorry, I'm having trouble connecting to the edge intelligence server.");
+    }
+}
+
+function appendMessage(sender, text, id = null) {
+    const chatMessages = document.getElementById('chatMessages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${sender}`;
+    if (id) msgDiv.id = id;
+    msgDiv.innerText = text;
+    chatMessages.appendChild(msgDiv);
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Start connection
