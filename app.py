@@ -36,6 +36,9 @@ STATE = {
         'ax': 0, 'ay': 0, 'az': 0,
         'gx': 0, 'gy': 0, 'gz': 0
     },
+    'previous_data': {
+        'ax': 0, 'ay': 0, 'az': 0
+    },
     'co2_saved': 0.0, # in grams
     'radio_state': "DEEP SLEEP"
 }
@@ -123,18 +126,33 @@ def get_data_payload():
     
     is_cloud_transmitted = (STATE['system_status'] in ["ANOMALY", "Anomaly Detected"] or STATE['total_data_points'] % 20 == 0)
     
-    # Calculate Radio State based on transmission
-    if is_cloud_transmitted:
+    # Calculate sensor delta for TAIL vs DEEP SLEEP
+    delta = abs(STATE['current_data']['ax'] - STATE['previous_data']['ax']) + \
+            abs(STATE['current_data']['ay'] - STATE['previous_data']['ay']) + \
+            abs(STATE['current_data']['az'] - STATE['previous_data']['az'])
+    
+    # Update previous data for next comparison
+    STATE['previous_data'] = {
+        'ax': STATE['current_data']['ax'],
+        'ay': STATE['current_data']['ay'],
+        'az': STATE['current_data']['az']
+    }
+
+    # Radio State logic requested by user:
+    # 1. ACTIVE = Anomaly
+    # 2. TAIL = Changing values (delta > threshold)
+    # 3. DEEP SLEEP = Stable values
+    if STATE['system_status'] in ["ANOMALY", "Anomaly Detected"]:
         STATE['radio_state'] = "ACTIVE"
-        STATE['last_tx_time'] = time.time()
-        STATE['transmitted_data_points'] += 1
+    elif delta > 0.1: # Significant change threshold for TAIL
+        STATE['radio_state'] = "TAIL"
     else:
-        # If not active, check if we are in "Tail" period (2 seconds after TX)
-        time_since_tx = time.time() - STATE['last_tx_time']
-        if time_since_tx < 2.0:
-            STATE['radio_state'] = "TAIL"
-        else:
-            STATE['radio_state'] = "DEEP SLEEP"
+        STATE['radio_state'] = "DEEP SLEEP"
+
+    if is_cloud_transmitted:
+        STATE['transmitted_data_points'] += 1
+        STATE['last_tx_time'] = time.time()
+    else:
         calculate_co2_saved()
 
     efficiency = round((1 - (STATE['transmitted_data_points'] / STATE['total_data_points'])) * 100, 1)
