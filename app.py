@@ -1,7 +1,15 @@
-import time
-import random
 import threading
 import json
+import logging
+import time
+import random
+
+# --- LOGGING CONFIGURATION ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%d-%m %H:%M:%S'
+)
 try:
     import serial
     HAS_SERIAL = True
@@ -36,54 +44,64 @@ def serial_listener():
     """Background thread that listens to the Serial port."""
     global system_status, total_data_points, transmitted_data_points, current_data, last_real_data_time
     
-    if not HAS_SERIAL:
-        return
+    while True:
+        try:
+            logging.info(f"SERIAL: Attempting to connect to {SERIAL_PORT}...")
+            ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1.0)
+            ser.reset_input_buffer()
+            time.sleep(0.5) 
+            logging.info(f"SERIAL: SUCCESS! Connected to {SERIAL_PORT}.")
+            
+            while True:
+                line = ser.readline().decode('utf-8', errors='ignore').strip()
+                if not line:
+                    continue
+                
+                # Debug: Show EXACTLY what is being received
+                logging.debug(f"DEBUG RAW: '{line}'")
+                
+                # Skip header or empty lines
+                if any(h in line for h in ["aX", "Accel", "Timestamp"]):
+                    continue
+                
+                parts = [p.strip() for p in line.split(',')]
+                if len(parts) >= 7:
+                    try:
+                        # Handle potential label prefixes like "aX: 1.23"
+                        def clean_val(s):
+                            if ':' in s: return s.split(':')[-1].strip()
+                            return s
 
-    try:
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
-        ser.flushInput()
-        time.sleep(1) 
-        print(f"SERIAL: Connected to {SERIAL_PORT} at {BAUD_RATE} baud.")
+                        ax = float(clean_val(parts[0]))
+                        ay = float(clean_val(parts[1]))
+                        az = float(clean_val(parts[2]))
+                        gx = float(clean_val(parts[3]))
+                        gy = float(clean_val(parts[4]))
+                        gz = float(clean_val(parts[5]))
+                        status_str = parts[6]
+                        
+                        current_data = {
+                            'ax': ax, 'ay': ay, 'az': az,
+                            'gx': gx, 'gy': gy, 'gz': gz
+                        }
+                        total_data_points += 1
+                        last_real_data_time = time.time()
+                        
+                        system_status = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        logging.info(f"SERIAL VALID: {current_data['ax']}, {current_data['ay']}, {current_data['az']} | STATUS: {system_status}")
+                        
+                    except ValueError as ve:
+                        logging.error(f"SERIAL PARSE ERROR: {ve} in line: {line}")
         
-        while True:
-            if ser.in_waiting > 0:
-                byte_string = ser.readline()
-                try:
-                    line = byte_string.decode('utf-8', errors='ignore').strip()
-                    if not line: continue
-                    
-                    # Log the raw line for debugging
-                    print(f"SERIAL Received: {line}")
-                    
-                    if "aX" in line: continue # Skip header
-                    
-                    parts = [p.strip() for p in line.split(',')]
-                    if len(parts) >= 7:
-                        try:
-                            ax, ay, az = map(float, parts[0:3])
-                            gx, gy, gz = map(float, parts[3:6])
-                            status_str = parts[6]
-                            
-                            current_data = {
-                                'ax': ax, 'ay': ay, 'az': az,
-                                'gx': gx, 'gy': gy, 'gz': gz
-                            }
-                            total_data_points += 1
-                            last_real_data_time = time.time()
-                            
-                            if status_str.upper() == "OK":
-                                system_status = "Healthy"
-                            else:
-                                system_status = status_str
-                        except ValueError:
-                            print(f"SERIAL ERROR: Could not parse floats in line: {line}")
-                except Exception as e:
-                    print(f"SERIAL DECODE ERROR: {e}")
+        except serial.SerialException as e:
+            if "Busy" in str(e) or "Permission" in str(e):
+                logging.critical(f"SERIAL CRITICAL: Port {SERIAL_PORT} is BUSY or ACCESS DENIED. Close Minicom/other apps!")
             else:
-                time.sleep(0.01) # Small sleep to prevent CPU hogging
-    except Exception as e:
-        print(f"SERIAL ERROR: {e}")
-        time.sleep(2) # Wait before retry if port fails
+                logging.error(f"SERIAL ERROR: {e}")
+            time.sleep(2)
+        except Exception as e:
+            logging.error(f"SERIAL UNKNOWN ERROR: {e}")
+            time.sleep(2)
 
 def get_data_payload():
     global system_status, total_data_points, transmitted_data_points, current_data, co2_saved, last_real_data_time
@@ -156,5 +174,5 @@ if __name__ == '__main__':
     serial_thread = threading.Thread(target=serial_listener, daemon=True)
     serial_thread.start()
     
-    print("Dashboard server starting on http://localhost:5001")
+    logging.info("Dashboard server starting on http://localhost:5001")
     serve(app, host='0.0.0.0', port=5001, threads=4)
