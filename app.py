@@ -25,21 +25,22 @@ SERIAL_PORT = '/dev/ttyACM0'
 BAUD_RATE = 9600
 # ---------------------
 
-# State variables
-system_status = "Healthy"
-total_data_points = 0
-transmitted_data_points = 0
-last_tx_time = time.time()
-last_real_data_time = 0
-current_data = {
-    'ax': 0, 'ay': 0, 'az': 0,
-    'gx': 0, 'gy': 0, 'gz': 0
+# --- GLOBAL STATE (Dictionary avoids scoping issues) ---
+STATE = {
+    'system_status': "Healthy",
+    'total_data_points': 0,
+    'transmitted_data_points': 0,
+    'last_tx_time': time.time(),
+    'last_real_data_time': 0,
+    'current_data': {
+        'ax': 0, 'ay': 0, 'az': 0,
+        'gx': 0, 'gy': 0, 'gz': 0
+    },
+    'co2_saved': 0.0 # in grams
 }
-co2_saved = 0.0 # in grams
 
 def calculate_co2_saved():
-    global co2_saved, last_tx_time
-    time_since_tx = time.time() - last_tx_time
+    time_since_tx = time.time() - STATE['last_tx_time']
     
     # Simulation of 6G Radio Energy States:
     # 1. Active/Tail (0-3s): Radio is power-hungry, minimal saving.
@@ -53,12 +54,10 @@ def calculate_co2_saved():
     else:
         increment = 0.002 # Minimal savings due to Tail Energy
         
-    co2_saved += increment
+    STATE['co2_saved'] += increment
 
 def serial_listener():
     """Background thread that listens to the Serial port."""
-    global system_status, total_data_points, transmitted_data_points, current_data, last_real_data_time
-    
     while True:
         try:
             logging.info(f"SERIAL: Attempting to connect to {SERIAL_PORT}...")
@@ -95,22 +94,22 @@ def serial_listener():
                         gz = float(clean_val(parts[5]))
                         status_str = parts[6]
                         
-                        current_data = {
+                        STATE['current_data'] = {
                             'ax': ax, 'ay': ay, 'az': az,
                             'gx': gx, 'gy': gy, 'gz': gz
                         }
-                        total_data_points += 1
-                        last_real_data_time = time.time()
+                        STATE['total_data_points'] += 1
+                        STATE['last_real_data_time'] = time.time()
                         
-                        system_status = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
-                        logging.info(f"SERIAL VALID: {current_data['ax']}, {current_data['ay']}, {current_data['az']} | STATUS: {system_status}")
+                        STATE['system_status'] = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
                         
                     except ValueError as ve:
                         logging.error(f"SERIAL PARSE ERROR: {ve} in line: {line}")
         
         except serial.SerialException as e:
             if "Busy" in str(e) or "Permission" in str(e):
-                logging.critical(f"SERIAL CRITICAL: Port {SERIAL_PORT} is BUSY or ACCESS DENIED. Close Minicom/other apps!")
+                logging.critical(f"SERIAL CRITICAL: Port {SERIAL_PORT} is BUSY or ACCESS DENIED.")
             else:
                 logging.error(f"SERIAL ERROR: {e}")
             time.sleep(2)
@@ -119,55 +118,49 @@ def serial_listener():
             time.sleep(2)
 
 def get_data_payload():
-    global system_status, total_data_points, transmitted_data_points, current_data, co2_saved, last_real_data_time, last_tx_time
-    
     # If no data has arrived in the last 2 seconds, use mock data
-    is_mocking = (time.time() - last_real_data_time > 2.0)
+    is_mocking = (time.time() - STATE['last_real_data_time'] > 2.0)
     
     if is_mocking:
-        ax = random.uniform(-0.05, 0.05)
-        ay = random.uniform(-0.05, 0.05)
-        az = random.uniform(0.95, 1.05)
-        gx = random.uniform(-1, 1)
-        gy = random.uniform(-1, 1)
-        gz = random.uniform(-1, 1)
-        current_data = {
-            'ax': ax, 'ay': ay, 'az': az,
-            'gx': gx, 'gy': gy, 'gz': gz
+        STATE['current_data'] = {
+            'ax': random.uniform(-0.05, 0.05),
+            'ay': random.uniform(-0.05, 0.05),
+            'az': random.uniform(0.95, 1.05),
+            'gx': random.uniform(-1, 1),
+            'gy': random.uniform(-1, 1),
+            'gz': random.uniform(-1, 1)
         }
-        # In mock mode, we still increment total_points to keep the dashboard "alive"
-        # but we don't update last_real_data_time
-        total_data_points += 1
-        system_status = "Mocking Data (No Sensor)"
+        STATE['total_data_points'] += 1
+        STATE['system_status'] = "Mocking Data (No Sensor)"
     
-    is_cloud_transmitted = (system_status == "ANOMALY" or system_status == "Anomaly Detected" or total_data_points % 20 == 0)
+    is_cloud_transmitted = (STATE['system_status'] in ["ANOMALY", "Anomaly Detected"] or STATE['total_data_points'] % 20 == 0)
     
     if is_cloud_transmitted:
-        transmitted_data_points += 1
-        last_tx_time = time.time() # Reset "Tail Energy" timer
+        STATE['transmitted_data_points'] += 1
+        STATE['last_tx_time'] = time.time() 
     else:
         calculate_co2_saved()
 
-    efficiency = round((1 - (transmitted_data_points / total_data_points)) * 100, 1)
+    efficiency = round((1 - (STATE['transmitted_data_points'] / STATE['total_data_points'])) * 100, 1)
     
-    time_since_tx = time.time() - last_tx_time
+    time_since_tx = time.time() - STATE['last_tx_time']
     radio_state = "ACTIVE" if time_since_tx < 1.0 else ("TAIL" if time_since_tx < 3.0 else "DEEP SLEEP")
 
     return {
-        'ax': round(current_data['ax'], 3),
-        'ay': round(current_data['ay'], 3),
-        'az': round(current_data['az'], 3),
-        'gx': round(current_data['gx'], 3),
-        'gy': round(current_data['gy'], 3),
-        'gz': round(current_data['gz'], 3),
-        'status': system_status,
+        'ax': round(STATE['current_data']['ax'], 3),
+        'ay': round(STATE['current_data']['ay'], 3),
+        'az': round(STATE['current_data']['az'], 3),
+        'gx': round(STATE['current_data']['gx'], 3),
+        'gy': round(STATE['current_data']['gy'], 3),
+        'gz': round(STATE['current_data']['gz'], 3),
+        'status': STATE['system_status'],
         'efficiency': efficiency,
-        'co2_saved': round(co2_saved, 2),
+        'co2_saved': round(STATE['co2_saved'], 2),
         'radio_state': radio_state,
         'transmitted': is_cloud_transmitted,
         'timestamp': time.strftime("%H:%M:%S"),
-        'total_points': total_data_points,
-        'transmitted_points': transmitted_data_points,
+        'total_points': STATE['total_data_points'],
+        'transmitted_points': STATE['transmitted_data_points'],
         'is_real': not is_mocking
     }
 
