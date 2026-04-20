@@ -45,6 +45,8 @@ STATE = {
     'mock_anomaly_duration': 0
 }
 
+STATE_CHANGE_EVENT = threading.Event()
+
 def calculate_co2_saved():
     # Simple linear saving model
     STATE['co2_saved'] += 0.05
@@ -95,12 +97,16 @@ def serial_listener():
                         STATE['last_real_data_time'] = time.time()
                         
                         new_status = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        
                         if new_status != "Healthy" and STATE['system_status'] == "Healthy":
                             current_t = time.time()
                             if current_t - STATE.get('last_anomaly_time', 0) > 1.0:
                                 STATE['anomaly_count'] += 1
                                 STATE['last_anomaly_time'] = current_t
-                        STATE['system_status'] = new_status
+                                
+                        if new_status != STATE['system_status']:
+                            STATE['system_status'] = new_status
+                            STATE_CHANGE_EVENT.set()
                             
                         logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
                         
@@ -199,7 +205,9 @@ def chart_data():
             data = get_data_payload()
             if data:
                 yield f"data: {json.dumps(data)}\n\n"
-            time.sleep(0.5)
+            # Wait for a state change to push immediately, else poll at 0.5s for normal chart movement
+            STATE_CHANGE_EVENT.wait(timeout=0.5)
+            STATE_CHANGE_EVENT.clear()
             
     response = Response(generate(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'
