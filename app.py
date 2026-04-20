@@ -42,8 +42,11 @@ STATE = {
     'co2_saved': 0.0, # in grams
     'radio_state': "DEEP SLEEP",
     'anomaly_count': 0,
-    'mock_anomaly_duration': 0
+    'mock_anomaly_duration': 0,
+    'new_anomaly_trigger': False
 }
+
+STATE_CHANGE_EVENT = threading.Event()
 
 def calculate_co2_saved():
     # Simple linear saving model
@@ -56,11 +59,22 @@ def serial_listener():
             logging.info(f"SERIAL: Attempting to connect to {SERIAL_PORT}...")
             ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1.0)
             ser.reset_input_buffer()
-            time.sleep(0.5) 
             logging.info(f"SERIAL: SUCCESS! Connected to {SERIAL_PORT}.")
             
             while True:
-                line = ser.readline().decode('utf-8', errors='ignore').strip()
+                # --- PREVENT STALE TELEMETRY (BUFFER LAG) ---
+                # 1. Flush the buffer to clear out old queued readings
+                ser.reset_input_buffer()
+                
+                # 2. Read and discard the first line (it might be chopped in half by the flush)
+                ser.readline()
+                
+                # 3. Read the absolute newest, complete line of real-time data
+                raw_bytes = ser.readline()
+                if not raw_bytes:
+                    continue
+                    
+                line = raw_bytes.decode('utf-8', errors='ignore').strip()
                 if not line:
                     continue
                 
@@ -72,6 +86,8 @@ def serial_listener():
                     continue
                 
                 parts = [p.strip() for p in line.split(',')]
+                
+                # Ensure we have all 7 expected parts from minicom
                 if len(parts) >= 7:
                     try:
                         # Handle potential label prefixes like "aX: 1.23"
@@ -94,11 +110,32 @@ def serial_listener():
                         STATE['total_data_points'] += 1
                         STATE['last_real_data_time'] = time.time()
                         
-                        STATE['system_status'] = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
-                        if STATE['system_status'] != "Healthy":
-                            STATE['anomaly_count'] += 1
+                        new_status = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        current_t = time.time()
+                        
+                        # --- DEBOUNCE AND STATE FILTER LOGIC ---
+                        if new_status != "Healthy":
+                            # Continuously push the cooldown timer forward as long as the hardware keeps shaking
+                            STATE['last_anomaly_time'] = current_t
                             
-                        logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
+                            # Only count as a new anomaly if the UI was fully "Healthy" beforehand
+                            if STATE['system_status'] == "Healthy":
+                                STATE['anomaly_count'] += 1
+                                STATE['new_anomaly_trigger'] = True
+                                STATE['system_status'] = new_status
+                                STATE_CHANGE_EVENT.set()
+                                logging.info(f"SERIAL ANOMALY TRIGGERED! Total count: {STATE['anomaly_count']}")
+                                
+                        else:
+                            # It's a "Healthy" reading, but we enforce a cooldown!
+                            # Only transition back to Healthy if 1.0 full second has passed 
+                            # since the VERY LAST anomalous hardware spike.
+                            if STATE['system_status'] != "Healthy":
+                                if (current_t - STATE.get('last_anomaly_time', 0)) > 1.0:
+                                    STATE['system_status'] = "Healthy"
+                                    STATE_CHANGE_EVENT.set()
+                                    logging.info("SERIAL RECOVERED: System is back to Healthy.")
+                        # ---------------------------------------
                         
                     except ValueError as ve:
                         logging.error(f"SERIAL PARSE ERROR: {ve} in line: {line}")
@@ -166,6 +203,10 @@ def get_data_payload():
 
     efficiency = round((1 - (STATE['transmitted_data_points'] / STATE['total_data_points'])) * 100, 1)
     
+    is_new = STATE.get('new_anomaly_trigger', False)
+    if is_new:
+        STATE['new_anomaly_trigger'] = False
+    
     return {
         'ax': round(STATE['current_data']['ax'], 3),
         'ay': round(STATE['current_data']['ay'], 3),
@@ -181,7 +222,8 @@ def get_data_payload():
         'timestamp': time.strftime("%H:%M:%S"),
         'total_points': STATE['total_data_points'],
         'transmitted_points': STATE['transmitted_data_points'],
-        'is_real': not is_mocking
+        'is_real': not is_mocking,
+        'is_new_anomaly': is_new
     }
 
 @app.route('/')
@@ -195,7 +237,9 @@ def chart_data():
             data = get_data_payload()
             if data:
                 yield f"data: {json.dumps(data)}\n\n"
-            time.sleep(0.5)
+            # Wait for a state change to push immediately, else poll at 0.5s for normal chart movement
+            STATE_CHANGE_EVENT.wait(timeout=0.5)
+            STATE_CHANGE_EVENT.clear()
             
     response = Response(generate(), mimetype='text/event-stream')
     response.headers['Cache-Control'] = 'no-cache'
@@ -207,6 +251,7 @@ def mock_anomaly():
     STATE['system_status'] = "ANOMALY DETECTED"
     STATE['anomaly_count'] += 1
     STATE['mock_anomaly_duration'] = 10 # Last for ~5 seconds (at 0.5s intervals)
+    STATE['new_anomaly_trigger'] = True
     return {"status": "success", "count": STATE['anomaly_count']}
 
 @app.route('/chat', methods=['POST'])
