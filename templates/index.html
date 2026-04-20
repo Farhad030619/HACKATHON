@@ -52,7 +52,10 @@
 
             <!-- Detailed Telemetry -->
             <div class="card">
-                <h2>Live Telemetry</h2>
+                <div class="card-header-flex">
+                    <h2>Live Telemetry</h2>
+                    <button id="downloadBtn" class="download-btn" onclick="downloadCSV()">Download CSV</button>
+                </div>
                 <div class="telemetry-grid">
                     <div class="telemetry-group">
                         <p class="group-label">Accelerometer (m/s²)</p>
@@ -106,6 +109,20 @@
                         Carbon footprint reduction through localized Edge AI processing.
                     </p>
                     <div class="leaf-icon">🍃</div>
+                </div>
+            </div>
+
+            <!-- System Console -->
+            <div class="card console-card">
+                <div class="card-header-flex">
+                    <h2>Serial Console Log</h2>
+                    <button class="download-btn" onclick="downloadCSV()">Download Log CSV</button>
+                </div>
+                <div id="consoleOutput" class="console-container">
+                    <div class="console-line">
+                        <span class="console-timestamp">[--:--:--]</span>
+                        <span class="console-message">System initialized. Waiting for sensor data...</span>
+                    </div>
                 </div>
             </div>
         </div>

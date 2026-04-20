@@ -75,8 +75,27 @@ const chart = new Chart(ctx, {
 
 const MAX_DATA_POINTS = 50;
 let efficiencyMode = 'PERCENTAGE';
+let telemetryHistory = [];
 
 function updateDashboard(data) {
+    // Save to history for CSV export
+    telemetryHistory.push({
+        timestamp: data.timestamp,
+        ax: data.ax,
+        ay: data.ay,
+        az: data.az,
+        gx: data.gx,
+        gy: data.gy,
+        gz: data.gz,
+        status: data.status,
+        is_real: data.is_real
+    });
+
+    // Keep history manageable (e.g., last 1000 points)
+    if (telemetryHistory.length > 1000) {
+        telemetryHistory.shift();
+    }
+
     // Update Chart
     chart.data.labels.push('');
     chart.data.datasets[0].data.push(data.ax);
@@ -124,12 +143,81 @@ function updateDashboard(data) {
     
     document.getElementById('lastUpdate').innerText = data.timestamp;
 
+    // Update Console
+    updateConsole(data);
+
     // Visual feedback
     const efficiencyCard = document.getElementById('efficiencyCard');
     if (data.transmitted) {
         efficiencyCard.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.2)';
         setTimeout(() => { efficiencyCard.style.boxShadow = 'none'; }, 300);
     }
+}
+
+function updateConsole(data) {
+    const consoleOutput = document.getElementById('consoleOutput');
+    const line = document.createElement('div');
+    line.className = 'console-line';
+    
+    const isAnomaly = data.status !== 'Healthy' && data.status !== 'OK';
+    const messageClass = isAnomaly ? 'console-message anomaly' : 'console-message';
+    
+    // Format: [HH:MM:SS] aX: 0.000, aY: 0.000, aZ: 0.000 | Status: OK
+    line.innerHTML = `
+        <span class="console-timestamp">[${data.timestamp}]</span>
+        <span class="${messageClass}">
+            ACCEL: ${data.ax.toFixed(3)}, ${data.ay.toFixed(3)}, ${data.az.toFixed(3)} | 
+            GYRO: ${data.gx.toFixed(2)}, ${data.gy.toFixed(2)}, ${data.gz.toFixed(2)} | 
+            STATUS: ${data.status}
+        </span>
+    `;
+    
+    consoleOutput.appendChild(line);
+    
+    // Limit console lines to 50
+    if (consoleOutput.children.length > 50) {
+        consoleOutput.removeChild(consoleOutput.firstChild);
+    }
+    
+    // Auto-scroll
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+function downloadCSV() {
+    if (telemetryHistory.length === 0) {
+        alert("No data to export yet!");
+        return;
+    }
+
+    const headers = ["Timestamp", "aX", "aY", "aZ", "gX", "gY", "gZ", "Status", "IsReal"];
+    const csvRows = [headers.join(",")];
+
+    telemetryHistory.forEach(d => {
+        const row = [
+            d.timestamp,
+            d.ax.toFixed(3),
+            d.ay.toFixed(3),
+            d.az.toFixed(3),
+            d.gx.toFixed(2),
+            d.gy.toFixed(2),
+            d.gz.toFixed(2),
+            d.status,
+            d.is_real ? "YES" : "NO"
+        ];
+        csvRows.push(row.join(","));
+    });
+
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const fileName = `nibble_ai_log_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function toggleEfficiencyMode() {
