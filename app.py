@@ -213,13 +213,13 @@ def mock_anomaly():
 def chat():
     from flask import request
     query = request.json.get('query', '').lower()
+    csv_count = request.json.get('csv_anomaly_count', 0)
     
     # Nibble AI: Short, Simple, Edge-focused responses
     if any(k in query for k in ["how many anomalies", "anomaly count", "how many errors"]):
-        count = STATE['anomaly_count']
-        if count == 0:
+        if csv_count == 0:
             return {"response": "Zero anomalies detected. The system is operating within nominal parameters."}
-        return {"response": f"I've recorded {count} anomalies so far. Most recent event was handled by URLLC priority uplink."}
+        return {"response": f"I've recorded {csv_count} anomalies so far based on the current CSV data. Most recent event was handled by URLLC priority uplink."}
 
     if any(k in query for k in ["anomaly", "anomalies", "errors", "broken"]):
         status = STATE['system_status']
