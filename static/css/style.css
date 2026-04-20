@@ -148,27 +148,50 @@ h2 {
 
 /* Telemetry Grid */
 .telemetry-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
     margin-top: 1rem;
+}
+
+.telemetry-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.group-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.2rem;
+}
+
+.telemetry-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
 }
 
 .telemetry-item {
     display: flex;
-    justify-content: space-between;
-    padding: 0.8rem;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.6rem;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
 }
 
 .telemetry-item .label {
     color: var(--text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.6rem;
+    margin-bottom: 0.2rem;
 }
 
 .telemetry-item .value {
     font-weight: 700;
+    font-size: 0.9rem;
     font-family: 'JetBrains Mono', monospace;
     color: var(--accent-cyan);
 }

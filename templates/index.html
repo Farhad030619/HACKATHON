@@ -54,17 +54,39 @@
             <div class="card">
                 <h2>Live Telemetry</h2>
                 <div class="telemetry-grid">
-                    <div class="telemetry-item">
-                        <span class="label">X-Axis</span>
-                        <span id="rawX" class="value">0.000</span>
+                    <div class="telemetry-group">
+                        <p class="group-label">Accelerometer (m/s²)</p>
+                        <div class="telemetry-row">
+                            <div class="telemetry-item">
+                                <span class="label">aX</span>
+                                <span id="rawAX" class="value">0.000</span>
+                            </div>
+                            <div class="telemetry-item">
+                                <span class="label">aY</span>
+                                <span id="rawAY" class="value">0.000</span>
+                            </div>
+                            <div class="telemetry-item">
+                                <span class="label">aZ</span>
+                                <span id="rawAZ" class="value">0.000</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="telemetry-item">
-                        <span class="label">Y-Axis</span>
-                        <span id="rawY" class="value">0.000</span>
-                    </div>
-                    <div class="telemetry-item">
-                        <span class="label">Z-Axis</span>
-                        <span id="rawZ" class="value">0.000</span>
+                    <div class="telemetry-group">
+                        <p class="group-label">Gyroscope (deg/s)</p>
+                        <div class="telemetry-row">
+                            <div class="telemetry-item">
+                                <span class="label">gX</span>
+                                <span id="rawGX" class="value">0.00</span>
+                            </div>
+                            <div class="telemetry-item">
+                                <span class="label">gY</span>
+                                <span id="rawGY" class="value">0.00</span>
+                            </div>
+                            <div class="telemetry-item">
+                                <span class="label">gZ</span>
+                                <span id="rawGZ" class="value">0.00</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="timestamp-display">

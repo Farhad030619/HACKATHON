@@ -74,11 +74,11 @@ let timeIndex = 0;
 
 source.onmessage = function(event) {
     const data = JSON.parse(event.data);
-    // Update Chart
+    // Update Chart (using accelerometer data for the main chart)
     chart.data.labels.push('');
-    chart.data.datasets[0].data.push(data.x);
-    chart.data.datasets[1].data.push(data.y);
-    chart.data.datasets[2].data.push(data.z);
+    chart.data.datasets[0].data.push(data.ax);
+    chart.data.datasets[1].data.push(data.ay);
+    chart.data.datasets[2].data.push(data.az);
 
     if (chart.data.labels.length > MAX_DATA_POINTS) {
         chart.data.labels.shift();
@@ -98,7 +98,7 @@ source.onmessage = function(event) {
         statusText.style.color = '#00ff88';
     } else {
         statusIndicator.className = 'status-indicator status-anomaly';
-        statusText.innerText = 'ANOMALY DETECTED';
+        statusText.innerText = data.status.toUpperCase();
         statusText.style.color = '#ff3366';
     }
 
@@ -108,10 +108,18 @@ source.onmessage = function(event) {
     // Update CO2
     document.getElementById('co2Value').innerText = data.co2_saved.toFixed(2);
 
-    // Update Raw Telemetry
-    document.getElementById('rawX').innerText = data.x.toFixed(3);
-    document.getElementById('rawY').innerText = data.y.toFixed(3);
-    document.getElementById('rawZ').innerText = data.z.toFixed(3);
+    // Update Raw Telemetry (Accelerometer)
+    document.getElementById('rawAX').innerText = data.ax.toFixed(3);
+    document.getElementById('rawAY').innerText = data.ay.toFixed(3);
+    document.getElementById('rawAZ').innerText = data.az.toFixed(3);
+    
+    // Update Raw Telemetry (Gyroscope)
+    if (document.getElementById('rawGX')) {
+        document.getElementById('rawGX').innerText = data.gx.toFixed(2);
+        document.getElementById('rawGY').innerText = data.gy.toFixed(2);
+        document.getElementById('rawGZ').innerText = data.gz.toFixed(2);
+    }
+    
     document.getElementById('lastUpdate').innerText = data.timestamp;
 
     // Visual feedback for 'Cloud Transmission'
