@@ -104,4 +104,22 @@ source.onmessage = function(event) {
 
     // Update Efficiency
     document.getElementById('efficiencyValue').innerText = data.efficiency + '%';
+
+    // Update CO2
+    document.getElementById('co2Value').innerText = data.co2_saved.toFixed(2);
+
+    // Update Raw Telemetry
+    document.getElementById('rawX').innerText = data.x.toFixed(3);
+    document.getElementById('rawY').innerText = data.y.toFixed(3);
+    document.getElementById('rawZ').innerText = data.z.toFixed(3);
+    document.getElementById('lastUpdate').innerText = data.timestamp;
+
+    // Visual feedback for 'Cloud Transmission'
+    const efficiencyCard = document.getElementById('efficiencyValue').parentElement.parentElement;
+    if (data.transmitted) {
+        efficiencyCard.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.2)';
+        setTimeout(() => {
+            efficiencyCard.style.boxShadow = 'none';
+        }, 300);
+    }
 });

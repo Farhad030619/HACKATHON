@@ -46,6 +46,43 @@
                     </p>
                 </div>
             </div>
+
+            <!-- Detailed Telemetry -->
+            <div class="card">
+                <h2>Live Telemetry</h2>
+                <div class="telemetry-grid">
+                    <div class="telemetry-item">
+                        <span class="label">X-Axis</span>
+                        <span id="rawX" class="value">0.000</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="label">Y-Axis</span>
+                        <span id="rawY" class="value">0.000</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="label">Z-Axis</span>
+                        <span id="rawZ" class="value">0.000</span>
+                    </div>
+                </div>
+                <div class="timestamp-display">
+                    Last Update: <span id="lastUpdate">--:--:--</span>
+                </div>
+            </div>
+
+            <!-- Sustainability Card -->
+            <div class="card sustainability-card">
+                <h2>Sustainability Impact</h2>
+                <div class="sustainability-display">
+                    <div class="co2-counter">
+                        <span id="co2Value">0.00</span>
+                        <span class="unit">g CO₂</span>
+                    </div>
+                    <p class="impact-text">
+                        Carbon footprint reduction through localized Edge AI processing.
+                    </p>
+                    <div class="leaf-icon">🍃</div>
+                </div>
+            </div>
         </div>
 
         <footer style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">

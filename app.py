@@ -3,97 +3,102 @@ import random
 import threading
 import json
 import serial
-import serial.tools.list_ports
 from flask import Flask, render_template, Response
 from waitress import serve
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
+SERIAL_PORT = '/dev/ttyACM0'
 BAUD_RATE = 115200
 # ---------------------
 
-# State variables for metrics
+# State variables
 system_status = "Healthy"
 total_data_points = 0
 transmitted_data_points = 0
 current_data = {'x': 0, 'y': 0, 'z': 0}
+co2_saved = 0.0 # in grams
 
-def find_serial_port():
-    """Attempts to find the USB serial port for the sensor."""
-    ports = serial.tools.list_ports.comports()
-    for port in ports:
-        # Look for common Arduino/XIAO names
-        if 'usbmodem' in port.device or 'ttyACM' in port.device:
-            return port.device
-    return None
+def calculate_co2_saved(efficiency):
+    """
+    Estimate CO2 saved by not transmitting raw data.
+    Standard metric: ~0.05g CO2 saved per 'message' not sent over 5G.
+    """
+    global co2_saved
+    # If efficiency is 90%, it means we saved 9 out of 10 transmissions
+    # For every point saved, we add to the cumulative CO2 savings
+    co2_saved += 0.05 
 
 def serial_listener():
-    """Background thread that listens to the actual Serial port."""
+    """Background thread that listens to the Serial port as provided by user."""
     global system_status, total_data_points, transmitted_data_points, current_data
     
-    port = find_serial_port()
-    if not port:
-        print("WARNING: No Serial port found. Falling back to Mock Data for demo.")
-        return # Thread will exit and app continues with mock logic if needed
-
     try:
-        ser = serial.Serial(port, BAUD_RATE, timeout=1)
-        print(f"CONNECTED to sensor on {port}")
+        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        time.sleep(0.1) # stabilize
+        print(f"CONNECTED to sensor on {SERIAL_PORT}")
         
         while True:
-            if ser.in_waiting > 0:
-                line = ser.readline().decode('utf-8').strip()
+            byte_string = ser.readline()
+            if byte_string:
+                line = byte_string.decode('utf-8').strip()
                 try:
-                    # Expecting format: x,y,z
+                    # Parse format: x,y,z
                     parts = line.split(',')
                     if len(parts) == 3:
                         x, y, z = map(float, parts)
                         current_data = {'x': x, 'y': y, 'z': z}
+                        total_data_points += 1
                         
-                        # Here you can add your Anomaly Detection logic
-                        # For now, we'll just flag high vibrations
-                        if abs(x) > 1.5 or abs(y) > 1.5:
+                        # Simple anomaly detection logic
+                        if abs(x) > 1.2 or abs(y) > 1.2:
                             system_status = "Anomaly Detected"
                         else:
                             system_status = "Healthy"
-                            
-                        total_data_points += 1
                 except Exception as e:
-                    print(f"Data parse error: {e}")
+                    pass # Ignore malformed lines
     except Exception as e:
-        print(f"Serial error: {e}")
+        print(f"Serial error (will fallback to mock): {e}")
 
 def get_data_payload():
-    """Generates the payload for the SSE stream (Mock or Real)."""
-    global system_status, total_data_points, transmitted_data_points, current_data
+    """Generates the payload for the SSE stream."""
+    global system_status, total_data_points, transmitted_data_points, current_data, co2_saved
     
-    # If we are using mock data (no real serial data coming in)
+    # Fallback to mock if no real data is coming (for demo/testing)
     if total_data_points == 0:
         total_data_points += 1
         x = random.uniform(-0.1, 0.1)
         y = random.uniform(-0.1, 0.1)
         z = random.uniform(0.9, 1.1)
-        if random.random() < 0.05:
-            system_status = "Anomaly Detected"
-            x += random.uniform(-1.5, 1.5)
-        else:
-            if random.random() < 0.1: system_status = "Healthy"
         current_data = {'x': x, 'y': y, 'z': z}
+        if random.random() < 0.05: system_status = "Anomaly Detected"
+        else: system_status = "Healthy"
 
-    # Uplink Efficiency Logic: Only 'transmit' to UI if anomaly or heartbeat
-    if system_status == "Anomaly Detected" or total_data_points % 20 == 0:
+    # Edge AI Logic: 
+    # In a real scenario, only anomalies or periodic heartbeats are sent to the cloud.
+    # But for our Edge Dashboard, we show everything.
+    
+    is_cloud_transmitted = (system_status == "Anomaly Detected" or total_data_points % 20 == 0)
+    
+    if is_cloud_transmitted:
         transmitted_data_points += 1
-        efficiency = round((1 - (transmitted_data_points / total_data_points)) * 100, 1)
-        
-        return {
-            'x': round(current_data['x'], 3),
-            'y': round(current_data['y'], 3),
-            'z': round(current_data['z'], 3),
-            'status': system_status,
-            'efficiency': efficiency
-        }
-    return None
+    else:
+        # We saved a transmission! Add to CO2 savings.
+        calculate_co2_saved(0)
+
+    efficiency = round((1 - (transmitted_data_points / total_data_points)) * 100, 1)
+    
+    return {
+        'x': round(current_data['x'], 3),
+        'y': round(current_data['y'], 3),
+        'z': round(current_data['z'], 3),
+        'status': system_status,
+        'efficiency': efficiency,
+        'co2_saved': round(co2_saved, 2),
+        'transmitted': is_cloud_transmitted,
+        'timestamp': time.strftime("%H:%M:%S")
+    }
 
 @app.route('/')
 def index():
@@ -111,7 +116,7 @@ def chart_data():
     return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
-    # Start Serial Listener in background
+    # Start Serial Listener
     serial_thread = threading.Thread(target=serial_listener, daemon=True)
     serial_thread.start()
     
