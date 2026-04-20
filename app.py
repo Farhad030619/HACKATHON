@@ -94,11 +94,8 @@ def serial_listener():
                         STATE['total_data_points'] += 1
                         STATE['last_real_data_time'] = time.time()
                         
-                        # Normalize status: anything not healthy becomes "ANOMALY"
-                        if status_str.upper() in ["OK", "HEALTHY"]:
-                            STATE['system_status'] = "Healthy"
-                        else:
-                            STATE['system_status'] = "ANOMALY"
+                        STATE['system_status'] = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        if STATE['system_status'] != "Healthy":
                             STATE['anomaly_count'] += 1
                             
                         logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
@@ -131,12 +128,12 @@ def get_data_payload():
         }
         STATE['total_data_points'] += 1
         if STATE['mock_anomaly_duration'] > 0:
-            STATE['system_status'] = "ANOMALY"
+            STATE['system_status'] = "ANOMALY DETECTED"
             STATE['mock_anomaly_duration'] -= 1
         else:
             STATE['system_status'] = "Mocking Data (No Sensor)"
     
-    is_cloud_transmitted = (STATE['system_status'] == "ANOMALY" or STATE['total_data_points'] % 20 == 0)
+    is_cloud_transmitted = (STATE['system_status'] in ["ANOMALY", "Anomaly Detected"] or STATE['total_data_points'] % 20 == 0)
     
     # Calculate sensor delta for TAIL vs DEEP SLEEP
     delta = abs(STATE['current_data']['ax'] - STATE['previous_data']['ax']) + \
@@ -154,7 +151,7 @@ def get_data_payload():
     # 1. ACTIVE = Anomaly
     # 2. TAIL = Changing values (delta > threshold)
     # 3. DEEP SLEEP = Stable values
-    if STATE['system_status'] == "ANOMALY":
+    if STATE['system_status'] in ["ANOMALY", "Anomaly Detected"]:
         STATE['radio_state'] = "ACTIVE"
     elif delta > 0.1: # Significant change threshold for TAIL
         STATE['radio_state'] = "TAIL"
@@ -216,13 +213,13 @@ def mock_anomaly():
 def chat():
     from flask import request
     query = request.json.get('query', '').lower()
-    csv_count = request.json.get('csv_anomaly_count', 0)
     
     # Nibble AI: Short, Simple, Edge-focused responses
     if any(k in query for k in ["how many anomalies", "anomaly count", "how many errors"]):
-        if csv_count == 0:
+        count = STATE['anomaly_count']
+        if count == 0:
             return {"response": "Zero anomalies detected. The system is operating within nominal parameters."}
-        return {"response": f"I've recorded {csv_count} anomalies so far based on the current CSV data. Most recent event was handled by URLLC priority uplink."}
+        return {"response": f"I've recorded {count} anomalies so far. Most recent event was handled by URLLC priority uplink."}
 
     if any(k in query for k in ["anomaly", "anomalies", "errors", "broken"]):
         status = STATE['system_status']
