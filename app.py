@@ -94,9 +94,13 @@ def serial_listener():
                         STATE['total_data_points'] += 1
                         STATE['last_real_data_time'] = time.time()
                         
-                        STATE['system_status'] = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
-                        if STATE['system_status'] != "Healthy":
-                            STATE['anomaly_count'] += 1
+                        new_status = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
+                        if new_status != "Healthy":
+                            current_t = time.time()
+                            if current_t - STATE.get('last_anomaly_time', 0) > 2.0:
+                                STATE['anomaly_count'] += 1
+                            STATE['last_anomaly_time'] = current_t
+                        STATE['system_status'] = new_status
                             
                         logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
                         
