@@ -294,10 +294,24 @@ async function sendMessage() {
     appendMessage('system', 'Nibble is thinking...', thinkingId);
 
     try {
+        // Count distinct anomaly events (contiguous blocks of anomalies)
+        let csvAnomalyCount = 0;
+        let inAnomaly = false;
+        
+        telemetryHistory.forEach(d => {
+            const isAnomaly = d.status !== 'Healthy' && d.status !== 'OK' && !d.status.includes('Mocking');
+            if (isAnomaly && !inAnomaly) {
+                csvAnomalyCount++;
+                inAnomaly = true;
+            } else if (!isAnomaly && inAnomaly) {
+                inAnomaly = false;
+            }
+        });
+
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: query })
+            body: JSON.stringify({ query: query, csv_anomaly_count: csvAnomalyCount })
         });
         const data = await response.json();
         
