@@ -294,19 +294,24 @@ async function sendMessage() {
     appendMessage('system', 'Nibble is thinking...', thinkingId);
 
     try {
-        // Count distinct anomaly events (contiguous blocks of anomalies)
+        // Count distinct anomaly events (contiguous blocks of ANOMALY status)
         let csvAnomalyCount = 0;
         let inAnomaly = false;
-        
+
         telemetryHistory.forEach(d => {
-            const isAnomaly = d.status !== 'Healthy' && d.status !== 'OK' && !d.status.includes('Mocking');
+            const isAnomaly = d.status === 'ANOMALY';
             if (isAnomaly && !inAnomaly) {
                 csvAnomalyCount++;
                 inAnomaly = true;
-            } else if (!isAnomaly && inAnomaly) {
+            } else if (!isAnomaly) {
                 inAnomaly = false;
             }
         });
+
+        // Debug: log current state in browser console
+        console.log('[NibbleAI] History size:', telemetryHistory.length,
+            '| Unique statuses:', [...new Set(telemetryHistory.map(d => d.status))],
+            '| Anomaly events:', csvAnomalyCount);
 
         const response = await fetch('/chat', {
             method: 'POST',

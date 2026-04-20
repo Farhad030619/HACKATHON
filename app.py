@@ -94,8 +94,11 @@ def serial_listener():
                         STATE['total_data_points'] += 1
                         STATE['last_real_data_time'] = time.time()
                         
-                        STATE['system_status'] = "Healthy" if status_str.upper() in ["OK", "HEALTHY"] else status_str
-                        if STATE['system_status'] != "Healthy":
+                        # Normalize status: anything not healthy becomes "ANOMALY"
+                        if status_str.upper() in ["OK", "HEALTHY"]:
+                            STATE['system_status'] = "Healthy"
+                        else:
+                            STATE['system_status'] = "ANOMALY"
                             STATE['anomaly_count'] += 1
                             
                         logging.info(f"SERIAL VALID: {STATE['current_data']['ax']}, {STATE['current_data']['ay']} | STATUS: {STATE['system_status']}")
@@ -128,12 +131,12 @@ def get_data_payload():
         }
         STATE['total_data_points'] += 1
         if STATE['mock_anomaly_duration'] > 0:
-            STATE['system_status'] = "ANOMALY DETECTED"
+            STATE['system_status'] = "ANOMALY"
             STATE['mock_anomaly_duration'] -= 1
         else:
             STATE['system_status'] = "Mocking Data (No Sensor)"
     
-    is_cloud_transmitted = (STATE['system_status'] in ["ANOMALY", "Anomaly Detected"] or STATE['total_data_points'] % 20 == 0)
+    is_cloud_transmitted = (STATE['system_status'] == "ANOMALY" or STATE['total_data_points'] % 20 == 0)
     
     # Calculate sensor delta for TAIL vs DEEP SLEEP
     delta = abs(STATE['current_data']['ax'] - STATE['previous_data']['ax']) + \
@@ -151,7 +154,7 @@ def get_data_payload():
     # 1. ACTIVE = Anomaly
     # 2. TAIL = Changing values (delta > threshold)
     # 3. DEEP SLEEP = Stable values
-    if STATE['system_status'] in ["ANOMALY", "Anomaly Detected"]:
+    if STATE['system_status'] == "ANOMALY":
         STATE['radio_state'] = "ACTIVE"
     elif delta > 0.1: # Significant change threshold for TAIL
         STATE['radio_state'] = "TAIL"
